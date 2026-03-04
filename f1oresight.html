@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F1oreSight — Race Prediction System</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;500&family=Barlow+Condensed:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red: #e8001d;
+    --red-dim: #8a0010;
+    --gold: #d4a017;
+    --bg: #080808;
+    --bg2: #0f0f0f;
+    --bg3: #161616;
+    --bg4: #1e1e1e;
+    --line: #2a2a2a;
+    --text: #e8e8e8;
+    --muted: #666;
+    --green: #00d26a;
+    --blue: #0090d4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ===== HEADER ===== */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 0 2rem 0 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    position: sticky;
+    top: 0;
+    background: rgba(8,8,8,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: 1.4rem;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .logo span.f1 { color: var(--red); }
+  .logo span.ore { color: var(--text); }
+  .logo span.sight { color: var(--muted); font-weight: 400; }
+
+  .logo-flag {
+    display: flex;
+    gap: 2px;
+    margin-right: 0.5rem;
+  }
+  .logo-flag div {
+    width: 6px;
+    height: 18px;
+    background: var(--text);
+  }
+  .logo-flag div:nth-child(even) { background: var(--bg); }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    display: inline-block;
+    margin-right: 4px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    min-height: calc(100vh - 64px);
+  }
+
+  /* ===== SIDEBAR ===== */
+  aside {
+    border-right: 1px solid var(--line);
+    padding: 2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    background: var(--bg2);
+  }
+
+  .sidebar-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .sidebar-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--red);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .sidebar-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  select, input[type="number"] {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--line);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 3px;
+    appearance: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+
+  select:focus, input:focus {
+    outline: none;
+    border-color: var(--red);
+  }
+
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23666' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 2rem;
+  }
+
+  .input-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+  }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 0.8rem 1.2rem;
+    border: none;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: var(--red);
+    color: white;
+  }
+
+  .btn-primary:hover {
+    background: #ff1a35;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(232,0,29,0.4);
+  }
+
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%);
+    transform: translateX(-100%);
+    transition: transform 0.4s;
+  }
+
+  .btn-primary:hover::after { transform: translateX(100%); }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--muted);
+    color: var(--text);
+  }
+
+  /* Model status */
+  .model-status {
+    background: var(--bg3);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .status-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+  }
+
+  .status-key { color: var(--muted); }
+  .status-val { color: var(--text); }
+  .status-val.ok { color: var(--green); }
+  .status-val.pending { color: var(--gold); }
+  .status-val.err { color: var(--red); }
+
+  .progress-bar {
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red), var(--gold));
+    border-radius: 2px;
+    transition: width 1.5s ease;
+    width: 0%;
+  }
+
+  /* ===== MAIN CONTENT ===== */
+  main {
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    overflow-y: auto;
+  }
+
+  /* Top metrics bar */
+  .metrics-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .metric-card {
+    background: var(--bg2);
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    transition: background 0.2s;
+  }
+
+  .metric-card:hover { background: var(--bg3); }
+
+  .metric-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+
+  .metric-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .metric-value.red { color: var(--red); }
+  .metric-value.gold { color: var(--gold); }
+  .metric-value.green { color: var(--green); }
+  .metric-value.blue { color: var(--blue); }
+
+  .metric-sub {
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  /* Section header */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+  }
+
+  /* Results table */
+  .results-panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .results-header {
+    display: grid;
+    grid-template-columns: 48px 2fr 2fr 80px 100px 120px;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    background: var(--bg3);
+  }
+
+  .col-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+  }
+
+  .result-row {
+    display: grid;
+    grid-template-columns: 48px 2fr 2fr 80px 100px 120px;
+    padding: 0.9rem 1.5rem;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+    transition: background 0.15s;
+    animation: rowIn 0.4s ease both;
+  }
+
+  @keyframes rowIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .result-row:last-child { border-bottom: none; }
+  .result-row:hover { background: var(--bg3); }
+
+  .rank-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 2px;
+  }
+
+  .rank-1 { background: var(--gold); color: #000; }
+  .rank-2 { background: #c0c0c0; color: #000; }
+  .rank-3 { background: #cd7f32; color: #000; }
+  .rank-other { background: var(--bg4); color: var(--muted); }
+
+  .driver-name {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .team-name {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .team-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  .pos-value {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
+  .predicted-pos {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .pos-number {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+  }
+
+  /* Win probability bar */
+  .win-prob-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .prob-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+
+  .prob-track {
+    height: 3px;
+    background: var(--line);
+    border-radius: 2px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .prob-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s ease;
+  }
+
+  /* Charts section */
+  .charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+  }
+
+  .chart-panel {
+    background: var(--bg2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1.5rem;
+  }
+
+  .bar-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 1rem;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.7rem;
+  }
+
+  .bar-driver { width: 40px; color: var(--muted); text-align: right; font-size: 0.65rem; letter-spacing: 0.05em; }
+
+  .bar-track {
+    flex: 1;
+    height: 20px;
+    background: var(--bg4);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar-fill {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    transition: width 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    width: 0%;
+  }
+
+  /* Feature importance */
+  .feature-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 1rem;
+  }
+
+  .feature-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .feature-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.65rem;
+    color: var(--muted);
+  }
+
+  .feature-name { color: var(--text); }
+
+  .feature-bar {
+    height: 6px;
+    background: var(--bg4);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .feature-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--red), var(--gold));
+    border-radius: 2px;
+    transition: width 1.5s ease;
+    width: 0%;
+  }
+
+  /* Empty / loading state */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+    gap: 1rem;
+    color: var(--muted);
+    text-align: center;
+  }
+
+  .empty-icon {
+    font-size: 3rem;
+    opacity: 0.3;
+  }
+
+  .empty-title {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .empty-sub { font-size: 0.7rem; line-height: 1.6; }
+
+  /* Loading animation */
+  .loading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+    color: var(--red);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 600;
+  }
+
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--line);
+    border-top-color: var(--red);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Log console */
+  .console {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    font-size: 0.68rem;
+    line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  .log-entry { display: flex; gap: 0.75rem; }
+  .log-time { color: var(--muted); min-width: 80px; }
+  .log-msg { color: var(--text); }
+  .log-msg.info { color: var(--blue); }
+  .log-msg.success { color: var(--green); }
+  .log-msg.warn { color: var(--gold); }
+  .log-msg.err { color: var(--red); }
+
+  /* Team colors */
+  .team-red-bull { background: #3671C6; }
+  .team-ferrari { background: #E8002D; }
+  .team-mercedes { background: #27F4D2; }
+  .team-mclaren { background: #FF8000; }
+  .team-alpine { background: #FF87BC; }
+  .team-aston { background: #229971; }
+  .team-williams { background: #64C4FF; }
+  .team-haas { background: #B6BABD; }
+  .team-rb { background: #6692FF; }
+  .team-sauber { background: #52E252; }
+  .team-default { background: #666; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--line); }
+    .metrics-row { grid-template-columns: 1fr 1fr; }
+    .charts-row { grid-template-columns: 1fr; }
+    .results-header, .result-row { grid-template-columns: 40px 1.5fr 1.5fr 60px 80px 100px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-flag">
+      <div></div><div></div><div></div><div></div><div></div><div></div>
+    </div>
+    <span class="f1">F1</span><span class="ore">ore</span><span class="sight">Sight</span>
+  </div>
+  <div class="header-status">
+    <span><span class="status-dot"></span>SYSTEM READY</span>
+    <span id="clock">--:--:--</span>
+    <span>ML ENGINE v2.4</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- SIDEBAR -->
+  <aside>
+    <div class="sidebar-section">
+      <div class="sidebar-label">Training Config</div>
+      <div>
+        <label>Season Range</label>
+        <div class="input-row">
+          <div>
+            <label>From</label>
+            <input type="number" id="yearStart" value="2022" min="2018" max="2025">
+          </div>
+          <div>
+            <label>To</label>
+            <input type="number" id="yearEnd" value="2024" min="2018" max="2025">
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="trainModel()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Train Model
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Prediction Target</div>
+      <div>
+        <label>Season</label>
+        <select id="predYear">
+          <option value="2025">2025</option>
+          <option value="2024" selected>2024</option>
+          <option value="2023">2023</option>
+        </select>
+      </div>
+      <div>
+        <label>Grand Prix</label>
+        <select id="predRound">
+          <option value="1">Rd 01 — Bahrain</option>
+          <option value="2">Rd 02 — Saudi Arabia</option>
+          <option value="3">Rd 03 — Australia</option>
+          <option value="4">Rd 04 — Japan</option>
+          <option value="5">Rd 05 — China</option>
+          <option value="6">Rd 06 — Miami</option>
+          <option value="7">Rd 07 — Emilia Romagna</option>
+          <option value="8">Rd 08 — Monaco</option>
+          <option value="9">Rd 09 — Canada</option>
+          <option value="10">Rd 10 — Spain</option>
+          <option value="11">Rd 11 — Austria</option>
+          <option value="12">Rd 12 — Britain</option>
+          <option value="13">Rd 13 — Hungary</option>
+          <option value="14">Rd 14 — Belgium</option>
+          <option value="15">Rd 15 — Netherlands</option>
+          <option value="16">Rd 16 — Italy</option>
+          <option value="17">Rd 17 — Azerbaijan</option>
+          <option value="18">Rd 18 — Singapore</option>
+          <option value="19">Rd 19 — USA</option>
+          <option value="20">Rd 20 — Mexico</option>
+          <option value="21">Rd 21 — Brazil</option>
+          <option value="22">Rd 22 — Las Vegas</option>
+          <option value="23">Rd 23 — Qatar</option>
+          <option value="24">Rd 24 — Abu Dhabi</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="predictRace()" id="predictBtn">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Run Prediction
+      </button>
+      <button class="btn btn-secondary" onclick="loadDemo()">Load Demo Data</button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Model Status</div>
+      <div class="model-status">
+        <div class="status-row">
+          <span class="status-key">Model</span>
+          <span class="status-val pending" id="modelStatus">NOT TRAINED</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Records</span>
+          <span class="status-val" id="recordCount">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">MAE</span>
+          <span class="status-val" id="maeScore">—</span>
+        </div>
+        <div class="status-row">
+          <span class="status-key">Win Acc.</span>
+          <span class="status-val" id="winAcc">—</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="trainProgress"></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main>
+    <!-- Metrics -->
+    <div class="metrics-row" id="metricsRow">
+      <div class="metric-card">
+        <div class="metric-label">Predicted Winner</div>
+        <div class="metric-value red" id="metricWinner">—</div>
+        <div class="metric-sub" id="metricWinTeam">Awaiting prediction</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Win Probability</div>
+        <div class="metric-value gold" id="metricWinProb">—</div>
+        <div class="metric-sub" id="metricWinProbSub">—</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Pole → Victory</div>
+        <div class="metric-value green" id="metricPole">—</div>
+        <div class="metric-sub">Pole sitter prediction</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">Drivers Analyzed</div>
+        <div class="metric-value blue" id="metricDrivers">—</div>
+        <div class="metric-sub">Full grid coverage</div>
+      </div>
+    </div>
+
+    <!-- Console log -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">System Log</div>
+        <div class="section-line"></div>
+        <span id="loadingIndicator" style="display:none" class="loading">
+          <div class="spinner"></div>
+          Processing
+        </span>
+      </div>
+      <div class="console" id="console">
+        <div class="log-entry">
+          <span class="log-time">00:00:00</span>
+          <span class="log-msg info">F1oreSight initialized. Load demo data or configure training parameters.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="resultsSection">
+      <div class="section-header">
+        <div class="section-title">Race Prediction Grid</div>
+        <div class="section-line"></div>
+      </div>
+      <div class="results-panel">
+        <div class="results-header">
+          <div class="col-label">Pos</div>
+          <div class="col-label">Driver</div>
+          <div class="col-label">Constructor</div>
+          <div class="col-label" style="text-align:center">Quali</div>
+          <div class="col-label">Pred. Pos</div>
+          <div class="col-label">Win Prob</div>
+        </div>
+        <div id="resultsBody">
+          <div class="empty-state">
+            <div class="empty-icon">🏁</div>
+            <div class="empty-title">No Predictions Yet</div>
+            <div class="empty-sub">Configure parameters and click<br>"Run Prediction" to generate the grid</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row" id="chartsSection" style="display:none">
+      <div class="chart-panel">
+        <div class="section-header">
+          <div class="section-title">Win Probability — Top 10</div>
+          <div class="section-line"></div>
+        </div>
+        <div class="bar-chart" id="winProbChart"></div>
+      </div>
+      <div class="chart-panel">
+        <div class="section-header">
+          <div class="section-title">Feature Importance</div>
+          <div class="section-line"></div>
+        </div>
+        <div class="feature-chart" id="featureChart"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toTimeString().slice(0,8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== LOGGING =====
+function log(msg, type = '') {
+  const now = new Date().toTimeString().slice(0,8);
+  const el = document.getElementById('console');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="log-time">${now}</span><span class="log-msg ${type}">${msg}</span>`;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ===== DEMO DATA =====
+const DEMO_DATA = [
+  { Driver: 'VER', Team: 'Red Bull Racing', Qualifying: 1, Predicted_Position: 1.12, Win_Probability: 42.3 },
+  { Driver: 'PER', Team: 'Red Bull Racing', Qualifying: 4, Predicted_Position: 3.21, Win_Probability: 18.7 },
+  { Driver: 'LEC', Team: 'Ferrari',         Qualifying: 2, Predicted_Position: 3.88, Win_Probability: 14.2 },
+  { Driver: 'SAI', Team: 'Ferrari',         Qualifying: 3, Predicted_Position: 4.10, Win_Probability: 11.5 },
+  { Driver: 'HAM', Team: 'Mercedes',        Qualifying: 6, Predicted_Position: 5.44, Win_Probability: 6.8  },
+  { Driver: 'RUS', Team: 'Mercedes',        Qualifying: 5, Predicted_Position: 5.99, Win_Probability: 5.9  },
+  { Driver: 'NOR', Team: 'McLaren',         Qualifying: 7, Predicted_Position: 6.77, Win_Probability: 4.4  },
+  { Driver: 'PIA', Team: 'McLaren',         Qualifying: 9, Predicted_Position: 8.02, Win_Probability: 2.1  },
+  { Driver: 'ALO', Team: 'Aston Martin',    Qualifying: 8, Predicted_Position: 8.55, Win_Probability: 1.8  },
+  { Driver: 'STR', Team: 'Aston Martin',    Qualifying: 12, Predicted_Position: 10.3, Win_Probability: 0.9 },
+  { Driver: 'GAS', Team: 'Alpine',          Qualifying: 10, Predicted_Position: 10.8, Win_Probability: 0.6 },
+  { Driver: 'OCO', Team: 'Alpine',          Qualifying: 11, Predicted_Position: 11.2, Win_Probability: 0.5 },
+  { Driver: 'TSU', Team: 'RB',              Qualifying: 13, Predicted_Position: 12.1, Win_Probability: 0.3 },
+  { Driver: 'RIC', Team: 'RB',              Qualifying: 14, Predicted_Position: 12.9, Win_Probability: 0.2 },
+  { Driver: 'MAG', Team: 'Haas F1 Team',   Qualifying: 15, Predicted_Position: 13.8, Win_Probability: 0.2 },
+  { Driver: 'HUL', Team: 'Haas F1 Team',   Qualifying: 17, Predicted_Position: 14.4, Win_Probability: 0.1 },
+  { Driver: 'ALB', Team: 'Williams',        Qualifying: 16, Predicted_Position: 14.8, Win_Probability: 0.1 },
+  { Driver: 'SAR', Team: 'Williams',        Qualifying: 18, Predicted_Position: 16.1, Win_Probability: 0.1 },
+  { Driver: 'BOT', Team: 'Kick Sauber',     Qualifying: 19, Predicted_Position: 17.0, Win_Probability: 0.0 },
+  { Driver: 'ZHO', Team: 'Kick Sauber',     Qualifying: 20, Predicted_Position: 18.0, Win_Probability: 0.0 },
+];
+
+const FEATURE_IMPORTANCE = [
+  { name: 'Grid Position',         importance: 0.312 },
+  { name: 'Qualifying Position',   importance: 0.289 },
+  { name: 'Avg Position (Last 3)', importance: 0.198 },
+  { name: 'Driver',                importance: 0.124 },
+  { name: 'Team',                  importance: 0.058 },
+  { name: 'Circuit',               importance: 0.019 },
+];
+
+function getTeamClass(team) {
+  const t = team.toLowerCase();
+  if (t.includes('red bull')) return 'team-red-bull';
+  if (t.includes('ferrari')) return 'team-ferrari';
+  if (t.includes('mercedes')) return 'team-mercedes';
+  if (t.includes('mclaren')) return 'team-mclaren';
+  if (t.includes('alpine')) return 'team-alpine';
+  if (t.includes('aston')) return 'team-aston';
+  if (t.includes('williams')) return 'team-williams';
+  if (t.includes('haas')) return 'team-haas';
+  if (t.includes('rb') || t.includes('alpha tauri') || t.includes('toro')) return 'team-rb';
+  if (t.includes('sauber') || t.includes('alfa')) return 'team-sauber';
+  return 'team-default';
+}
+
+function getProbColor(prob) {
+  if (prob > 30) return '#e8001d';
+  if (prob > 15) return '#d4a017';
+  if (prob > 5)  return '#0090d4';
+  return '#444';
+}
+
+function renderResults(data) {
+  const body = document.getElementById('resultsBody');
+  body.innerHTML = '';
+
+  data.forEach((d, i) => {
+    const rank = i + 1;
+    const rankClass = rank === 1 ? 'rank-1' : rank === 2 ? 'rank-2' : rank === 3 ? 'rank-3' : 'rank-other';
+    const rankText = rank <= 3 ? rank : rank;
+    const probColor = getProbColor(d.Win_Probability);
+    const teamClass = getTeamClass(d.Team);
+    const posDelta = d.Qualifying - rank;
+    const deltaStr = posDelta > 0 ? `▲${posDelta}` : posDelta < 0 ? `▼${Math.abs(posDelta)}` : '=';
+    const deltaColor = posDelta > 0 ? 'var(--green)' : posDelta < 0 ? 'var(--red)' : 'var(--muted)';
+
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.style.animationDelay = `${i * 0.04}s`;
+    row.innerHTML = `
+      <div><span class="rank-badge ${rankClass}">${rankText}</span></div>
+      <div>
+        <div class="driver-name">${d.Driver}</div>
+        <div style="font-size:0.65rem; color:var(--muted); margin-top:2px; letter-spacing:0.05em">${d.Team}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span class="team-dot ${teamClass}"></span>
+        <span style="font-size:0.75rem; letter-spacing:0.03em">${d.Team.split(' ').slice(0,2).join(' ')}</span>
+      </div>
+      <div class="pos-value" style="text-align:center">P${d.Qualifying}</div>
+      <div class="predicted-pos">
+        <span class="pos-number">${d.Predicted_Position.toFixed(2)}</span>
+        <span style="font-size:0.6rem; color:${deltaColor}">${deltaStr}</span>
+      </div>
+      <div class="win-prob-cell">
+        <span class="prob-label" style="color:${probColor}">${d.Win_Probability.toFixed(1)}%</span>
+        <div class="prob-track"><div class="prob-fill" data-prob="${d.Win_Probability}" style="background:${probColor}; width:0%"></div></div>
+      </div>
+    `;
+    body.appendChild(row);
+  });
+
+  // Animate prob bars
+  setTimeout(() => {
+    const maxProb = Math.max(...data.map(d => d.Win_Probability));
+    document.querySelectorAll('.prob-fill').forEach(el => {
+      const prob = parseFloat(el.dataset.prob);
+      el.style.width = (prob / maxProb * 100) + '%';
+    });
+  }, 100);
+}
+
+function renderCharts(data) {
+  document.getElementById('chartsSection').style.display = 'grid';
+
+  // Win prob bar chart - top 10
+  const top10 = data.slice(0, 10);
+  const maxProb = Math.max(...top10.map(d => d.Win_Probability));
+  const chart = document.getElementById('winProbChart');
+  chart.innerHTML = '';
+  top10.forEach(d => {
+    const color = getProbColor(d.Win_Probability);
+    const barRow = document.createElement('div');
+    barRow.className = 'bar-row';
+    barRow.innerHTML = `
+      <span class="bar-driver">${d.Driver}</span>
+      <div class="bar-track">
+        <div class="bar-fill" data-w="${d.Win_Probability / maxProb * 100}" style="background:${color};color:#fff;width:0%">
+          ${d.Win_Probability.toFixed(1)}%
+        </div>
+      </div>
+    `;
+    chart.appendChild(barRow);
+  });
+
+  // Feature importance chart
+  const fc = document.getElementById('featureChart');
+  fc.innerHTML = '';
+  FEATURE_IMPORTANCE.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'feature-row';
+    row.innerHTML = `
+      <div class="feature-meta">
+        <span class="feature-name">${f.name}</span>
+        <span>${(f.importance * 100).toFixed(1)}%</span>
+      </div>
+      <div class="feature-bar">
+        <div class="feature-fill" data-w="${f.importance * 100}"></div>
+      </div>
+    `;
+    fc.appendChild(row);
+  });
+
+  // Animate bars
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+    document.querySelectorAll('.feature-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 200);
+}
+
+function updateMetrics(data) {
+  const winner = data[0];
+  const poleDriver = data.find(d => d.Qualifying === 1);
+  const poleWins = poleDriver && poleDriver.Predicted_Position <= 1.5;
+
+  document.getElementById('metricWinner').textContent = winner.Driver;
+  document.getElementById('metricWinTeam').textContent = winner.Team;
+  document.getElementById('metricWinProb').textContent = winner.Win_Probability.toFixed(1) + '%';
+  document.getElementById('metricWinProbSub').textContent = `vs P2: ${data[1].Win_Probability.toFixed(1)}%`;
+  document.getElementById('metricPole').textContent = poleDriver ? poleDriver.Driver : '—';
+  document.getElementById('metricDrivers').textContent = data.length;
+}
+
+// ===== ACTIONS =====
+function setLoading(state) {
+  document.getElementById('loadingIndicator').style.display = state ? 'flex' : 'none';
+}
+
+function loadDemo() {
+  log('Loading demo prediction data...', 'info');
+  setLoading(true);
+
+  // Simulate model training
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += Math.random() * 15;
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(interval);
+    }
+    document.getElementById('trainProgress').style.width = progress + '%';
+  }, 100);
+
+  setTimeout(() => {
+    document.getElementById('modelStatus').textContent = 'TRAINED';
+    document.getElementById('modelStatus').className = 'status-val ok';
+    document.getElementById('recordCount').textContent = '4,280';
+    document.getElementById('maeScore').textContent = '2.14';
+    document.getElementById('winAcc').textContent = '84.3%';
+    log('Model loaded: RandomForest (100 trees, depth=10)', 'success');
+    log('Training data: 2022–2024 seasons, 4280 records', '');
+    log('MAE: 2.14 positions | Win accuracy: 84.3%', 'success');
+  }, 800);
+
+  setTimeout(() => {
+    const year = document.getElementById('predYear').value;
+    const round = document.getElementById('predRound');
+    const gp = round.options[round.selectedIndex].text.split('—')[1]?.trim() || 'Grand Prix';
+
+    log(`Running prediction: ${year} Round ${round.value} — ${gp}`, 'info');
+  }, 1200);
+
+  setTimeout(() => {
+    setLoading(false);
+    renderResults(DEMO_DATA);
+    renderCharts(DEMO_DATA);
+    updateMetrics(DEMO_DATA);
+    log('Prediction complete. Grid of 20 drivers analyzed.', 'success');
+    log('⚑ Predicted winner: VER (42.3% win probability)', 'success');
+  }, 2000);
+}
+
+function trainModel() {
+  const ys = document.getElementById('yearStart').value;
+  const ye = document.getElementById('yearEnd').value;
+
+  if (parseInt(ys) > parseInt(ye)) {
+    log('Error: Start year must be before end year', 'err');
+    return;
+  }
+
+  log(`Initiating model training: ${ys}–${ye} seasons`, 'info');
+  log('Note: This UI demonstrates the Python F1oreSight model.', 'warn');
+  log('Connect to a backend (FastAPI/Flask) to run real fastf1 training.', 'warn');
+
+  document.getElementById('modelStatus').textContent = 'TRAINING...';
+  document.getElementById('modelStatus').className = 'status-val pending';
+  setLoading(true);
+
+  let progress = 0;
+  const interval = setInterval(() => {
+    progress += Math.random() * 8;
+    if (progress >= 100) {
+      progress = 100;
+      clearInterval(interval);
+    }
+    document.getElementById('trainProgress').style.width = Math.min(progress, 100) + '%';
+  }, 150);
+
+  const seasons = parseInt(ye) - parseInt(ys) + 1;
+  const estRecords = seasons * 22 * 20;
+
+  setTimeout(() => {
+    log(`Scanning ${seasons} season(s)...`, '');
+  }, 500);
+  setTimeout(() => {
+    log(`Loading quali + race sessions via fastf1...`, '');
+  }, 1200);
+  setTimeout(() => {
+    log(`Feature engineering: rolling averages, grid delta...`, '');
+  }, 2000);
+  setTimeout(() => {
+    log(`Training RandomForestRegressor (position model)...`, '');
+  }, 2800);
+  setTimeout(() => {
+    log(`Training RandomForestClassifier (winner model)...`, '');
+  }, 3400);
+  setTimeout(() => {
+    setLoading(false);
+    document.getElementById('modelStatus').textContent = 'TRAINED';
+    document.getElementById('modelStatus').className = 'status-val ok';
+    document.getElementById('recordCount').textContent = `~${(estRecords/1000).toFixed(1)}k`;
+    document.getElementById('maeScore').textContent = (1.8 + Math.random()).toFixed(2);
+    document.getElementById('winAcc').textContent = (80 + Math.random() * 8).toFixed(1) + '%';
+    log('Training complete!', 'success');
+  }, 4200);
+}
+
+function predictRace() {
+  const year = document.getElementById('predYear').value;
+  const round = document.getElementById('predRound');
+  const gp = round.options[round.selectedIndex].text.split('—')[1]?.trim() || 'Race';
+
+  log(`Fetching qualifying data: ${year} Rd ${round.value} (${gp})`, 'info');
+  setLoading(true);
+
+  setTimeout(() => {
+    log('Loading Q session via fastf1...', '');
+  }, 400);
+  setTimeout(() => {
+    log('Encoding driver/team/circuit features...', '');
+  }, 900);
+  setTimeout(() => {
+    log('Running RandomForest prediction...', '');
+  }, 1400);
+  setTimeout(() => {
+    setLoading(false);
+    // Randomize slightly for demo variety
+    const varied = DEMO_DATA.map(d => ({
+      ...d,
+      Predicted_Position: Math.max(1, d.Predicted_Position + (Math.random() - 0.5) * 0.8),
+      Win_Probability: Math.max(0, d.Win_Probability + (Math.random() - 0.5) * 3)
+    })).sort((a, b) => a.Predicted_Position - b.Predicted_Position)
+      .map((d, i) => ({ ...d, Predicted_Rank: i + 1 }));
+
+    renderResults(varied);
+    renderCharts(varied);
+    updateMetrics(varied);
+    log(`Prediction ready: ${gp} ${year}`, 'success');
+    log(`⚑ Predicted winner: ${varied[0].Driver} (${varied[0].Win_Probability.toFixed(1)}%)`, 'success');
+  }, 2000);
+}
+</script>
+</body>
+</html>
